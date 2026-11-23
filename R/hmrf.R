@@ -27,6 +27,9 @@
 #' @param maxit integer, maximum EM iterations
 #' @param err numeric, relative change of means and covariances at which EM
 #'   stops
+#' @param label_tol numeric, share of cells changing domain at which EM stops
+#'   (labels can flip between two states without the parameters converging);
+#'   0 stops on `err` or `maxit` only, as \pkg{smfishHmrf}
 #' @param n_icm integer, ICM sweeps per EM iteration
 #' @param damp_tolerance,damp_factor see [hmrf_init()]
 #' @returns A list: `class` (integer domain per cell), `prob` (cells x k
@@ -55,12 +58,13 @@
 #' @export
 hmrf <- function(y, network, k, beta = 2, zscore = c("cell", "none"),
     init = NULL, blocks = NULL, nstart = 1000L, seed = 100L, maxit = 50L,
-    err = 1e-7, n_icm = 10L, damp_tolerance = 1e-5, damp_factor = 1.05) {
+    err = 1e-7, label_tol = 1e-4, n_icm = 10L, damp_tolerance = 1e-5,
+    damp_factor = 1.05) {
     zscore <- match.arg(zscore)
     if (is.null(rownames(y))) {
         stop("[hmrf] `y` needs cell IDs as row names", call. = FALSE)
     }
-    stopifnot(k >= 2, beta >= 0, maxit >= 1, n_icm >= 1)
+    stopifnot(k >= 2, beta >= 0, maxit >= 1, n_icm >= 1, label_tol >= 0)
     y <- as.matrix(y)
     if (identical(zscore, "cell")) y <- t(scale(t(y)))
     y[!is.finite(y)] <- 0
@@ -71,7 +75,7 @@ hmrf <- function(y, network, k, beta = 2, zscore = c("cell", "none"),
             damp_tolerance = damp_tolerance, damp_factor = damp_factor)
     }
     fit <- .hmrf_fit(y, adj, blocks, init, k = as.integer(k), beta = beta,
-        maxit = maxit, err = err, n_icm = n_icm)
+        maxit = maxit, err = err, label_tol = label_tol, n_icm = n_icm)
     rownames(fit$prob) <- rownames(y)
     c(fit, list(init = init, blocks = blocks))
 }
@@ -164,10 +168,12 @@ hmrf_init <- function(y, k, nstart = 1000L, seed = 100L,
     k <- ncol(mu)
     den <- matrix(0, n, k)
     for (j in seq_len(k)) {
-        s <- sigma[, , j] + diag(m) * damp[j]
-        dist <- sweep(y, 2L, mu[, j])
-        e <- -0.5 * rowSums((dist %*% solve(s)) * dist) -
-            ((m / 2) * log(2 * pi) + 0.5 * log(det(s)))
+        r <- chol(sigma[, , j] + diag(m) * damp[j])
+        ri <- backsolve(r, diag(m))
+        yr <- y %*% ri
+        c0 <- drop(mu[, j] %*% ri)
+        maha <- rowSums(yr * yr) - 2 * drop(yr %*% c0) + sum(c0 * c0)
+        e <- -0.5 * maha - ((m / 2) * log(2 * pi) + sum(log(diag(r))))
         den[, j] <- exp(pmin(700, pmax(e, -700)))
     }
     den
@@ -181,12 +187,14 @@ hmrf_init <- function(y, k, nstart = 1000L, seed = 100L,
 
 .hmrf_relerr <- function(a, b) max(abs(a - b)) / (1 + max(abs(a), abs(b)))
 
-.hmrf_fit <- function(y, adj, blocks, init, k, beta, maxit, err, n_icm) {
+.hmrf_fit <- function(y, adj, blocks, init, k, beta, maxit, err, n_icm,
+    label_tol = 0) {
     mu <- init$mu
     sigma <- init$sigma
     damp <- init$damp
     z <- .hmrf_onehot(max.col(.hmrf_density(y, mu, sigma, damp)), k)
     it <- 0L
+    cl_old <- max.col(z, "first")
     repeat {
         it <- it + 1L
         mu_old <- mu
@@ -209,11 +217,15 @@ hmrf_init <- function(y, k, nstart = 1000L, seed = 100L,
         w <- colSums(prob)
         mu <- crossprod(y, prob) %*% diag(1 / w, k)
         for (j in seq_len(k)) {
-            dist <- sweep(y, 2L, mu[, j])
-            sigma[, , j] <- crossprod(dist * prob[, j], dist) / w[j]
+            sigma[, , j] <- crossprod(y * sqrt(prob[, j])) / w[j] -
+                tcrossprod(mu[, j])
         }
+        cl <- max.col(prob, "first")
+        flipped <- mean(cl != cl_old)
+        cl_old <- cl
         if ((.hmrf_relerr(mu_old, mu) < err &&
-            .hmrf_relerr(sigma_old, sigma) < err) || it > maxit) break
+            .hmrf_relerr(sigma_old, sigma) < err) || flipped < label_tol ||
+            it > maxit) break
     }
     t_prob <- colMeans(unnorm / rowSums(unnorm))
     list(class = max.col(prob, "first"), prob = prob, mu = mu, sigma = sigma,
