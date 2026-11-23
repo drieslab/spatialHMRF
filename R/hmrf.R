@@ -121,9 +121,9 @@ hmrf_blocks <- function(adj) {
 #'   `damp_tolerance` gets the smallest diagonal term (searched in steps of
 #'   `damp_factor` from 1e-4) that brings it above. With more than
 #'   `subsample` cells, the `nstart` restarts run on a random `subsample` of
-#'   cells and one k-means on all cells refines the best centres, so the cost
-#'   of the restarts does not grow with the number of cells (\pkg{smfishHmrf}
-#'   runs them on all cells).
+#'   cells, k-means on all cells refines the 10 best, and the best refined
+#'   solution is kept, so the cost of the restarts does not grow with the
+#'   number of cells (\pkg{smfishHmrf} runs them on all cells).
 #' @param y cells x features matrix (already z-scored if wanted)
 #' @param k integer, number of domains
 #' @param nstart integer, k-means starts
@@ -140,8 +140,15 @@ hmrf_init <- function(y, k, nstart = 1000L, seed = 100L, subsample = 20000L,
     if (seed > 0) set.seed(seed)
     if (nrow(y) > subsample) {
         sub <- y[sort(sample.int(nrow(y), subsample)), , drop = FALSE]
-        start <- stats::kmeans(sub, k, nstart = nstart, iter.max = 100)
-        kk <- stats::kmeans(y, start$centers, iter.max = 100)
+        fits <- lapply(seq_len(nstart), function(i) {
+            stats::kmeans(sub, k, iter.max = 100)
+        })
+        wss <- vapply(fits, `[[`, numeric(1), "tot.withinss")
+        best <- order(wss)[seq_len(min(10L, nstart))]
+        full <- lapply(best, function(i) {
+            stats::kmeans(y, fits[[i]]$centers, iter.max = 100)
+        })
+        kk <- full[[which.min(vapply(full, `[[`, numeric(1), "tot.withinss"))]]
     } else {
         kk <- stats::kmeans(y, k, nstart = nstart, iter.max = 100)
     }

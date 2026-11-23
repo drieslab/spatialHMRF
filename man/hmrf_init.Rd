@@ -38,7 +38,7 @@ k-means start, per-domain covariances and damping, as in
 \code{damp_tolerance} gets the smallest diagonal term (searched in steps of
 \code{damp_factor} from 1e-4) that brings it above. With more than
 \code{subsample} cells, the \code{nstart} restarts run on a random \code{subsample} of
-cells and one k-means on all cells refines the best centres, so the cost
-of the restarts does not grow with the number of cells (\pkg{smfishHmrf}
-runs them on all cells).
+cells, k-means on all cells refines the 10 best, and the best refined
+solution is kept, so the cost of the restarts does not grow with the
+number of cells (\pkg{smfishHmrf} runs them on all cells).
 }
