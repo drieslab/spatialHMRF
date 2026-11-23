@@ -1,0 +1,7 @@
+^dev$
+^LICENSE\.md$
+^\.github$
+^.*\.Rproj$
+^\.Rproj\.user$
+^docs$
+^pkgdown$
