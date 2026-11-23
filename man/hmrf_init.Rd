@@ -9,6 +9,7 @@ hmrf_init(
   k,
   nstart = 1000L,
   seed = 100L,
+  subsample = 20000L,
   damp_tolerance = 1e-05,
   damp_factor = 1.05
 )
@@ -22,6 +23,9 @@ hmrf_init(
 
 \item{seed}{integer, seed (0 or negative leaves the RNG alone)}
 
+\item{subsample}{integer, number of cells for the restarts; \code{Inf} uses all
+cells}
+
 \item{damp_tolerance, damp_factor}{damping search settings}
 }
 \value{
@@ -32,5 +36,9 @@ k) and \code{damp} (length k).
 k-means start, per-domain covariances and damping, as in
 \pkg{smfishHmrf}: a domain whose covariance determinant is below
 \code{damp_tolerance} gets the smallest diagonal term (searched in steps of
-\code{damp_factor} from 1e-4) that brings it above.
+\code{damp_factor} from 1e-4) that brings it above. With more than
+\code{subsample} cells, the \code{nstart} restarts run on a random \code{subsample} of
+cells and one k-means on all cells refines the best centres, so the cost
+of the restarts does not grow with the number of cells (\pkg{smfishHmrf}
+runs them on all cells).
 }

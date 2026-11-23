@@ -65,3 +65,13 @@ test_that("label_tol stops label flipping early without changing the domains", {
     expect_gt(ari(fast$class, full$class), 0.95)
     expect_gte(ari(fast$class, s$dom), ari(full$class, s$dom) - 0.01)
 })
+
+test_that("hmrf_init subsamples restarts only above subsample", {
+    s <- sim_tissue(n = 600)
+    full <- hmrf_init(s$y, 2, nstart = 5)
+    expect_identical(hmrf_init(s$y, 2, nstart = 5, subsample = Inf), full)
+    sub <- hmrf_init(s$y, 2, nstart = 5, subsample = 200)
+    expect_equal(dim(sub$sigma), dim(full$sigma))
+    near <- max(abs(sort(sub$mu) - sort(full$mu)))
+    expect_lt(near, 0.1)
+})

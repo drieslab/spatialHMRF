@@ -23,7 +23,8 @@
 #'   several `beta`; computed from `y` when `NULL`
 #' @param blocks optional colour classes from [hmrf_blocks()]; computed from
 #'   `network` when `NULL`
-#' @param nstart,seed k-means starts and seed (used when `init` is `NULL`)
+#' @param nstart,seed,subsample k-means starts, seed and subsample size (used
+#'   when `init` is `NULL`, see [hmrf_init()])
 #' @param maxit integer, maximum EM iterations
 #' @param err numeric, relative change of means and covariances at which EM
 #'   stops
@@ -57,7 +58,8 @@
 #' @md
 #' @export
 hmrf <- function(y, network, k, beta = 2, zscore = c("cell", "none"),
-    init = NULL, blocks = NULL, nstart = 1000L, seed = 100L, maxit = 50L,
+    init = NULL, blocks = NULL, nstart = 1000L, seed = 100L,
+    subsample = 20000L, maxit = 50L,
     err = 1e-7, label_tol = 1e-4, n_icm = 10L, damp_tolerance = 1e-5,
     damp_factor = 1.05) {
     zscore <- match.arg(zscore)
@@ -72,7 +74,8 @@ hmrf <- function(y, network, k, beta = 2, zscore = c("cell", "none"),
     if (is.null(blocks)) blocks <- hmrf_blocks(adj)
     if (is.null(init)) {
         init <- hmrf_init(y, k, nstart = nstart, seed = seed,
-            damp_tolerance = damp_tolerance, damp_factor = damp_factor)
+            subsample = subsample, damp_tolerance = damp_tolerance,
+            damp_factor = damp_factor)
     }
     fit <- .hmrf_fit(y, adj, blocks, init, k = as.integer(k), beta = beta,
         maxit = maxit, err = err, label_tol = label_tol, n_icm = n_icm)
@@ -116,19 +119,32 @@ hmrf_blocks <- function(adj) {
 #' @description k-means start, per-domain covariances and damping, as in
 #'   \pkg{smfishHmrf}: a domain whose covariance determinant is below
 #'   `damp_tolerance` gets the smallest diagonal term (searched in steps of
-#'   `damp_factor` from 1e-4) that brings it above.
+#'   `damp_factor` from 1e-4) that brings it above. With more than
+#'   `subsample` cells, the `nstart` restarts run on a random `subsample` of
+#'   cells and one k-means on all cells refines the best centres, so the cost
+#'   of the restarts does not grow with the number of cells (\pkg{smfishHmrf}
+#'   runs them on all cells).
 #' @param y cells x features matrix (already z-scored if wanted)
 #' @param k integer, number of domains
 #' @param nstart integer, k-means starts
 #' @param seed integer, seed (0 or negative leaves the RNG alone)
+#' @param subsample integer, number of cells for the restarts; `Inf` uses all
+#'   cells
 #' @param damp_tolerance,damp_factor damping search settings
 #' @returns A list with `mu` (features x k), `sigma` (features x features x
 #'   k) and `damp` (length k).
 #' @export
-hmrf_init <- function(y, k, nstart = 1000L, seed = 100L,
+hmrf_init <- function(y, k, nstart = 1000L, seed = 100L, subsample = 20000L,
     damp_tolerance = 1e-5, damp_factor = 1.05) {
+    stopifnot(subsample >= k)
     if (seed > 0) set.seed(seed)
-    kk <- stats::kmeans(y, k, nstart = nstart, iter.max = 100)
+    if (nrow(y) > subsample) {
+        sub <- y[sort(sample.int(nrow(y), subsample)), , drop = FALSE]
+        start <- stats::kmeans(sub, k, nstart = nstart, iter.max = 100)
+        kk <- stats::kmeans(y, start$centers, iter.max = 100)
+    } else {
+        kk <- stats::kmeans(y, k, nstart = nstart, iter.max = 100)
+    }
     m <- ncol(y)
     sigma <- array(0, c(m, m, k))
     damp <- numeric(k)

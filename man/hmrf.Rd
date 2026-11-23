@@ -14,6 +14,7 @@ hmrf(
   blocks = NULL,
   nstart = 1000L,
   seed = 100L,
+  subsample = 20000L,
   maxit = 50L,
   err = 1e-07,
   label_tol = 1e-04,
@@ -42,7 +43,8 @@ several \code{beta}; computed from \code{y} when \code{NULL}}
 \item{blocks}{optional colour classes from \code{\link[=hmrf_blocks]{hmrf_blocks()}}; computed from
 \code{network} when \code{NULL}}
 
-\item{nstart, seed}{k-means starts and seed (used when \code{init} is \code{NULL})}
+\item{nstart, seed, subsample}{k-means starts, seed and subsample size (used
+when \code{init} is \code{NULL}, see \code{\link[=hmrf_init]{hmrf_init()}})}
 
 \item{maxit}{integer, maximum EM iterations}
 
