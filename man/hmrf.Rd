@@ -12,7 +12,7 @@ hmrf(
   zscore = c("cell", "none"),
   init = NULL,
   blocks = NULL,
-  nstart = 1000L,
+  nstart = 200L,
   seed = 100L,
   subsample = 20000L,
   maxit = 50L,

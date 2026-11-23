@@ -58,7 +58,7 @@
 #' @md
 #' @export
 hmrf <- function(y, network, k, beta = 2, zscore = c("cell", "none"),
-    init = NULL, blocks = NULL, nstart = 1000L, seed = 100L,
+    init = NULL, blocks = NULL, nstart = 200L, seed = 100L,
     subsample = 20000L, maxit = 50L,
     err = 1e-7, label_tol = 1e-4, n_icm = 10L, damp_tolerance = 1e-5,
     damp_factor = 1.05) {
@@ -126,7 +126,7 @@ hmrf_blocks <- function(adj) {
 #'   number of cells (\pkg{smfishHmrf} runs them on all cells).
 #' @param y cells x features matrix (already z-scored if wanted)
 #' @param k integer, number of domains
-#' @param nstart integer, k-means starts
+#' @param nstart integer, k-means starts (\pkg{smfishHmrf}: 1000)
 #' @param seed integer, seed (0 or negative leaves the RNG alone)
 #' @param subsample integer, number of cells for the restarts; `Inf` uses all
 #'   cells
@@ -134,7 +134,7 @@ hmrf_blocks <- function(adj) {
 #' @returns A list with `mu` (features x k), `sigma` (features x features x
 #'   k) and `damp` (length k).
 #' @export
-hmrf_init <- function(y, k, nstart = 1000L, seed = 100L, subsample = 20000L,
+hmrf_init <- function(y, k, nstart = 200L, seed = 100L, subsample = 20000L,
     damp_tolerance = 1e-5, damp_factor = 1.05) {
     stopifnot(subsample >= k)
     if (seed > 0) set.seed(seed)

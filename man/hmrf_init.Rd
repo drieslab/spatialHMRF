@@ -7,7 +7,7 @@
 hmrf_init(
   y,
   k,
-  nstart = 1000L,
+  nstart = 200L,
   seed = 100L,
   subsample = 20000L,
   damp_tolerance = 1e-05,
@@ -19,7 +19,7 @@ hmrf_init(
 
 \item{k}{integer, number of domains}
 
-\item{nstart}{integer, k-means starts}
+\item{nstart}{integer, k-means starts (\pkg{smfishHmrf}: 1000)}
 
 \item{seed}{integer, seed (0 or negative leaves the RNG alone)}
 
