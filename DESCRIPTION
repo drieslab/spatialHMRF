@@ -1,6 +1,6 @@
 Package: spatialHMRF
 Title: Spatial Domains with a Hidden Markov Random Field
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: c(
     person("Qian", "Zhu", role = "aut",
         comment = "original HMRF method and smfishHmrf implementation"),

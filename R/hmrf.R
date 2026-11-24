@@ -18,7 +18,10 @@
 #' @param k integer, number of domains
 #' @param beta numeric, strength of the spatial prior (0: no prior)
 #' @param zscore `"cell"` (default, as Giotto's `initHMRF_V2()`): z-score
-#'   each cell across the features; `"none"`: use `y` as given
+#'   each cell across the features; `"feature"`: z-score each feature across
+#'   the cells (for a few features on different scales, such as module
+#'   scores, where `"cell"` leaves the covariances singular); `"none"`: use
+#'   `y` as given
 #' @param init optional start from [hmrf_init()], e.g. to reuse one start for
 #'   several `beta`; computed from `y` when `NULL`
 #' @param blocks optional colour classes from [hmrf_blocks()]; computed from
@@ -57,7 +60,7 @@
 #' table(fit$class, dom)
 #' @md
 #' @export
-hmrf <- function(y, network, k, beta = 2, zscore = c("cell", "none"),
+hmrf <- function(y, network, k, beta = 2, zscore = c("cell", "feature", "none"),
     init = NULL, blocks = NULL, nstart = 200L, seed = 100L,
     subsample = 20000L, maxit = 50L,
     err = 1e-7, label_tol = 1e-4, n_icm = 10L, damp_tolerance = 1e-5,
@@ -69,6 +72,7 @@ hmrf <- function(y, network, k, beta = 2, zscore = c("cell", "none"),
     stopifnot(k >= 2, beta >= 0, maxit >= 1, n_icm >= 1, label_tol >= 0)
     y <- as.matrix(y)
     if (identical(zscore, "cell")) y <- t(scale(t(y)))
+    if (identical(zscore, "feature")) y <- scale(y)
     y[!is.finite(y)] <- 0
     adj <- hmrf_adjacency(network, rownames(y))
     if (is.null(blocks)) blocks <- hmrf_blocks(adj)
@@ -156,7 +160,9 @@ hmrf_init <- function(y, k, nstart = 200L, seed = 100L, subsample = 20000L,
     sigma <- array(0, c(m, m, k))
     damp <- numeric(k)
     for (j in seq_len(k)) {
-        sigma[, , j] <- stats::cov(y[kk$cluster == j, , drop = FALSE])
+        sj <- stats::cov(y[kk$cluster == j, , drop = FALSE])
+        sj[!is.finite(sj)] <- 0  # one-cell cluster
+        sigma[, , j] <- sj
         d <- .hmrf_damp(sigma[, , j], damp_factor, damp_tolerance)
         damp[j] <- if (is.null(d)) 0 else d
     }
@@ -191,7 +197,7 @@ hmrf_init <- function(y, k, nstart = 200L, seed = 100L, subsample = 20000L,
     k <- ncol(mu)
     den <- matrix(0, n, k)
     for (j in seq_len(k)) {
-        r <- chol(sigma[, , j] + diag(m) * damp[j])
+        r <- .hmrf_chol(sigma[, , j], damp[j])
         ri <- backsolve(r, diag(m))
         yr <- y %*% ri
         c0 <- drop(mu[, j] %*% ri)
@@ -200,6 +206,21 @@ hmrf_init <- function(y, k, nstart = 200L, seed = 100L, subsample = 20000L,
         den[, j] <- exp(pmin(700, pmax(e, -700)))
     }
     den
+}
+
+# Cholesky factor of sigma + damp * I. A domain's covariance can lose
+# positive definiteness during EM (a small or flat domain); the damping then
+# grows tenfold until the factor exists.
+.hmrf_chol <- function(sigma, damp) {
+    eye <- diag(nrow(sigma))
+    r <- tryCatch(chol(sigma + eye * damp), error = function(e) NULL)
+    if (!is.null(r)) return(r)
+    d <- max(damp, 1e-6 * max(mean(abs(diag(sigma))), 1e-12))
+    repeat {
+        r <- tryCatch(chol(sigma + eye * d), error = function(e) NULL)
+        if (!is.null(r)) return(r)
+        d <- d * 10
+    }
 }
 
 .hmrf_onehot <- function(cl, k) {
@@ -238,8 +259,9 @@ hmrf_init <- function(y, k, nstart = 200L, seed = 100L, subsample = 20000L,
         prob[!is.finite(rowSums(prob)), ] <- 1 / k
         unnorm <- den * exp(pmin(700, pmax(beta * nij, -700)))
         w <- colSums(prob)
-        mu <- crossprod(y, prob) %*% diag(1 / w, k)
-        for (j in seq_len(k)) {
+        mu_new <- crossprod(y, prob) %*% diag(1 / w, k)
+        for (j in which(w > 1e-8)) {  # an emptied domain keeps its estimates
+            mu[, j] <- mu_new[, j]
             sigma[, , j] <- crossprod(y * sqrt(prob[, j])) / w[j] -
                 tcrossprod(mu[, j])
         }

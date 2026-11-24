@@ -75,3 +75,15 @@ test_that("hmrf_init subsamples restarts only above subsample", {
     near <- max(abs(sort(sub$mu) - sort(full$mu)))
     expect_lt(near, 0.1)
 })
+
+test_that("few features on different scales: feature z-score, no singular fit", {
+    s <- sim_tissue(seed = 4)
+    y <- cbind(s$y[, 1:3], s$y[, 1:3] %*% c(1, 1, 1))  # linearly dependent
+    y[, 2] <- y[, 2] * 100
+    expect_no_error(fc <- hmrf(y, s$net, k = 3, beta = 0, zscore = "cell",
+        nstart = 10))
+    ff <- hmrf(y, s$net, k = 2, beta = 2, zscore = "feature", nstart = 10)
+    fs <- hmrf(scale(y), s$net, k = 2, beta = 2, zscore = "none", nstart = 10)
+    expect_identical(ff$class, fs$class)
+    expect_gt(ari(ff$class, s$dom), 0.8)
+})
