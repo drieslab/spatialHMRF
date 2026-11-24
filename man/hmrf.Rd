@@ -9,7 +9,7 @@ hmrf(
   network,
   k,
   beta = 2,
-  zscore = c("cell", "none"),
+  zscore = c("cell", "feature", "none"),
   init = NULL,
   blocks = NULL,
   nstart = 200L,
@@ -35,7 +35,10 @@ scaled expression of spatial genes)}
 \item{beta}{numeric, strength of the spatial prior (0: no prior)}
 
 \item{zscore}{\code{"cell"} (default, as Giotto's \code{initHMRF_V2()}): z-score
-each cell across the features; \code{"none"}: use \code{y} as given}
+each cell across the features; \code{"feature"}: z-score each feature across
+the cells (for a few features on different scales, such as module
+scores, where \code{"cell"} leaves the covariances singular); \code{"none"}: use
+\code{y} as given}
 
 \item{init}{optional start from \code{\link[=hmrf_init]{hmrf_init()}}, e.g. to reuse one start for
 several \code{beta}; computed from \code{y} when \code{NULL}}
