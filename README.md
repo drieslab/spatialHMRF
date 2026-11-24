@@ -10,6 +10,8 @@ It reimplements the model of the `smfishHmrf` package (used by Giotto's
 results on the same inputs. It depends only on Matrix and igraph.
 
 ```r
+remotes::install_github("drieslab/spatialHMRF")
+
 fit <- spatialHMRF::hmrf(y, network, k = 8, beta = 2)
 fit$class   # domain per cell
 fit$prob    # posterior probabilities
